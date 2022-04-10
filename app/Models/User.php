@@ -2,15 +2,18 @@
 
 namespace App\Models;
 
-use Illuminate\Contracts\Auth\MustVerifyEmail;
+use App\Enums\UserRoles;
+use App\Models\Traits\LegalEntityTrait;
+use App\Models\Traits\UnmaskTrait;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
-use Laravel\Sanctum\HasApiTokens;
+use Laravel\Passport\HasApiTokens;
+use Spatie\Permission\Traits\HasRoles;
 
 class User extends Authenticatable
 {
-    use HasApiTokens, HasFactory, Notifiable;
+    use HasApiTokens, UnmaskTrait, LegalEntityTrait, HasFactory, Notifiable, HasRoles;
 
     /**
      * The attributes that are mass assignable.
@@ -20,8 +23,12 @@ class User extends Authenticatable
     protected $fillable = [
         'name',
         'email',
+        'phone',
+        'document',
         'password',
     ];
+
+    protected $guard_name = 'api';
 
     /**
      * The attributes that should be hidden for serialization.
@@ -41,4 +48,24 @@ class User extends Authenticatable
     protected $casts = [
         'email_verified_at' => 'datetime',
     ];
+
+    protected $appends = ['role'];
+
+    public function getRoleAttribute()
+    {
+        $roles = $this->roles;
+        if (count($roles) > 0) {
+            return strtoupper($roles->first()->name);
+        } else {
+            return null;
+        }
+    }
+
+    public function isSuperAdmin ()
+    {
+        if ($this->hasRole(UserRoles::SUPER_ADMIN))
+            return true;
+
+        return false;
+    }
 }
