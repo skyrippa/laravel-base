@@ -30,3 +30,24 @@ Route::group(['prefix' => 'auth', 'namespace' => 'App\Http\Controllers\Auth'], f
         Route::post('change_password', 'AuthController@resetPassword');
     });
 });
+
+// MAIN ROUTES //
+Route::group(
+    ['namespace' => 'App\Http\Controllers\Api', 'middleware' => ['auth:api']],
+    function () {
+
+        // CLIENTS //
+        Route::get('clients/all', 'ClientController@indexAll');
+        Route::get('clients/{id}/audits', 'ClientController@audits');
+        Route::patch('clients/{id}/restore', 'ClientController@restore');
+        Route::resource('clients', 'ClientController');
+
+        // CLIENT MIDDLEWARE //
+        Route::group(['middleware' => ['client']], function () {
+            Route::get('addresses/all', 'AddressController@indexAll');
+            Route::get('addresses/{id}/audits', 'AddressController@audits');
+            Route::patch('addresses/{id}/restore', 'AddressController@restore');
+            Route::resource('addresses', 'AddressController');
+        });
+    }
+);

@@ -6,7 +6,7 @@ use App\Utils\Helpers;
 
 trait SanitizeTrait
 {
-    protected static function bootUnmaskTrait()
+    protected static function bootSanitizeTrait()
     {
         static::saving(function ($model) {
             self::sanitizeParams($model);

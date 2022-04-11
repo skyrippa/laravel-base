@@ -6,15 +6,15 @@ use App\Models\Traits\SanitizeTrait;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use OwenIt\Auditing\Contracts\Auditable as AuditableContracts;
+use \OwenIt\Auditing\Auditable;
 
-class Address extends Model
+class Address extends Model implements AuditableContracts
 {
-    use HasFactory, SoftDeletes, SanitizeTrait;
-
-    protected $table = 'des_customer_address';
+    use HasFactory, SoftDeletes, SanitizeTrait, Auditable;
 
     protected $fillable = [
-        'customer_id',
+        'client_id',
         'zip_code',
         'street',
         'house_number',
@@ -26,9 +26,9 @@ class Address extends Model
         'city_id',
     ];
 
-    public function user()
+    public function client()
     {
-        return $this->belongsTo(User::class);
+        return $this->belongsTo(Client::class);
     }
 
     public function city()

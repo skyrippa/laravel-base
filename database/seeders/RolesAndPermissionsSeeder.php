@@ -20,35 +20,65 @@ class RolesAndPermissionsSeeder extends Seeder
         $guard_api = ['guard_name' => 'api'];
 
         //  ROLES
-        $roleAdmin      = Role::updateOrCreate(['name' => UserRoles::SUPER_ADMIN], $guard_api);
+        $roleAdmin = Role::updateOrCreate(['name' => UserRoles::SUPER_ADMIN], $guard_api);
+        $roleClient = Role::updateOrCreate(['name' => UserRoles::CLIENT], $guard_api);
 
-        $adminPermissions   = [];
+        $adminPermissions = [];
+        $clientPermissions = [];
 
+        // CLIENTS //
         $adminPermissions[] = Permission::updateOrCreate(
-            ['name' => 'roles:list'],
-            array_merge($guard_api, ['description' => 'Listar Perfis'])
+            ['name' => 'clients:list'],
+            array_merge($guard_api, ['description' => 'Listar Clientes'])
         );
         $adminPermissions[] = Permission::updateOrCreate(
-            ['name' => 'roles:show'],
-            array_merge($guard_api, ['description' => 'Ver Detalhes de Perfis'])
+            ['name' => 'clients:show'],
+            array_merge($guard_api, ['description' => 'Ver Detalhes de Cliente'])
         );
         $adminPermissions[] = Permission::updateOrCreate(
-            ['name' => 'roles:create'],
-            array_merge($guard_api, ['description' => 'Cadastrar Perfis'])
+            ['name' => 'clients:create'],
+            array_merge($guard_api, ['description' => 'Cadastrar Clientes'])
         );
         $adminPermissions[] = Permission::updateOrCreate(
-            ['name' => 'roles:edit'],
-            array_merge($guard_api, ['description' => 'Editar Perfis'])
+            ['name' => 'clients:edit'],
+            array_merge($guard_api, ['description' => 'Editar Cliente'])
         );
         $adminPermissions[] = Permission::updateOrCreate(
-            ['name' => 'roles:delete'],
-            array_merge($guard_api, ['description' => 'Excluir Perfis'])
+            ['name' => 'clients:delete'],
+            array_merge($guard_api, ['description' => 'Excluir Cliente'])
         );
         $adminPermissions[] = Permission::updateOrCreate(
-            ['name' => 'roles:permissions'],
-            array_merge($guard_api, ['description' => 'Listar Permissoes do Perfil'])
+            ['name' => 'clients:audits'],
+            array_merge($guard_api, ['description' => 'Listar Auditoria de Clientes'])
+        );
+
+        // ADDRESSES //
+        $adminPermissions[] = $clientPermissions[] = Permission::updateOrCreate(
+            ['name' => 'addresses:list'],
+            array_merge($guard_api, ['description' => 'Listar Endereços'])
+        );
+        $adminPermissions[] = $clientPermissions[] = Permission::updateOrCreate(
+            ['name' => 'addresses:show'],
+            array_merge($guard_api, ['description' => 'Ver Detalhes de Endereço'])
+        );
+        $clientPermissions[] = Permission::updateOrCreate(
+            ['name' => 'addresses:create'],
+            array_merge($guard_api, ['description' => 'Cadastrar Endereços'])
+        );
+        $clientPermissions[] = Permission::updateOrCreate(
+            ['name' => 'addresses:edit'],
+            array_merge($guard_api, ['description' => 'Editar Endereço'])
+        );
+        $clientPermissions[] = Permission::updateOrCreate(
+            ['name' => 'addresses:delete'],
+            array_merge($guard_api, ['description' => 'Excluir Endereço'])
+        );
+        $clientPermissions[] = Permission::updateOrCreate(
+            ['name' => 'addresses:audits'],
+            array_merge($guard_api, ['description' => 'Listar Auditoria de Endereços'])
         );
 
         $roleAdmin->givePermissionTo($adminPermissions);
+        $roleClient->givePermissionTo($clientPermissions);
     }
 }

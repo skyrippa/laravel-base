@@ -69,8 +69,8 @@ class User extends Authenticatable
         return false;
     }
 
-    public function addresses()
+    public function client()
     {
-        return $this->hasMany(Address::class);
+        return $this->hasOne(Client::class);
     }
 }
