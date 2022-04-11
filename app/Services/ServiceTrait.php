@@ -5,8 +5,12 @@ namespace App\Services;
 use App\Http\Resources\DefaultCollection;
 use App\Utils\Helpers;
 use Exception;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 use Illuminate\Support\Facades\DB;
 use App\Http\Resources\AuditCollection;
 
@@ -55,40 +59,28 @@ trait ServiceTrait
      * Display a listing of the resource.
      *
      * @param Request $request
-     * @return JsonResponse
+     * @return AnonymousResourceCollection
      * @throws Exception
      */
     public function index (Request $request)
     {
-        if (method_exists($this->model(), 'getFillable'))
-            if (in_array('name', $this->model()->getFillable()) && !$request->order)
-                $request->merge(['order' => "name,asc"]);
-
-        $result = Helpers::indexQueryBuilder($request, $this->relationships(), $this->model());
-
+        $result = $this->model()->with($this->relationships())->get();
         $resourceCollection = $this->resourceCollection();
-
-        return new $resourceCollection($result);
+        return Helpers::paginateCollection(new $resourceCollection($result));
     }
 
     /**
      * Display a listing of the resource, including soft deleted ones.
      *
      * @param Request $request
-     * @return JsonResponse
+     * @return AnonymousResourceCollection
      * @throws Exception
      */
     public function indexAll (Request $request)
     {
-        if (method_exists($this->model(), 'getFillable'))
-            if (in_array('name', $this->model()->getFillable()) && !$request->order)
-                $request->merge(['order' => "name,asc"]);
-
-        $result = Helpers::indexQueryBuilder($request, $this->relationships(), $this->model()->withTrashed());
-
+        $result = $this->model()->withTrashed()->with($this->relationships())->get();
         $resourceCollection = $this->resourceCollection();
-
-        return new $resourceCollection($result);
+        return Helpers::paginateCollection(new $resourceCollection($result));
     }
 
     /**
@@ -117,7 +109,7 @@ trait ServiceTrait
      *
      * @param Request $request
      * @param $id
-     * @return JsonResponse
+     * @return Builder|Builder[]|Collection|Model|null
      */
     public function show (Request $request, $id = null)
     {
