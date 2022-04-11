@@ -1,9 +1,20 @@
 ## About Laravel Base
 
-Laravel Base is a base project for Laravel developers looking
-for a well-designed project architecture, respecting Laravel's 
-folders structure, but with some layers that will allow you
-to build an state-of-art Laravel monolithic application
+Laravel Base is a base project for Laravel developers looking for a well-designed project architecture, respecting Laravel's 
+folders structure, but with some layers that will allow you to build a state-of-art Laravel monolithic application.<br>
+This project consists on an RESTful API with ACL based on permissions and roles, with a main SUPER ADMIN, and a CLIENT role
+that would be using our product.
+The CLIENT user has specific permissions and middlewares for its own endpoints.
+
+### Client
+The application client, as mentioned above, is a role set in the application either to serve as guide for developers looking to
+create their own roles based on their application's needs, or ready-to-use for any developer that wishes to improve this role's
+permissions. On this base project, there is only one resource, which will be better described bellow.
+
+### Addresses
+This is the only resource which the Client users can interact with on this base project. There are permissions configured for each client to have
+their own addresses, secured with an auditory and ACL system already configured in the project. Any client user can do all CRUD operations,
+as well as soft deleting addresses, restoring them, and retrieving auditory for each address.
 
 ## Dependencies
 
