@@ -6,6 +6,7 @@ use App\Enums\UserRoles;
 use App\Models\User;
 use Carbon\Carbon;
 use Illuminate\Foundation\Testing\DatabaseMigrations;
+use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
 use Laravel\Passport\Passport;
 use Tests\TestCase;
@@ -18,9 +19,7 @@ class AuthControllerTest extends TestCase
     {
         parent::setUp();
 
-        \Artisan::call('db:seed', ['-vvv' => true]);
-
-        $this->withHeaders(['X-Device-Token' => 'sadsadsahdadadausdnasmnd387un']);
+        Artisan::call('db:seed');
     }
 
     private const URL = '/api/auth';
@@ -46,7 +45,7 @@ class AuthControllerTest extends TestCase
         $user     = User::factory()->create();
         $role     = UserRoles::SUPER_ADMIN;
 
-        \Artisan::call('db:seed', ['-vvv' => true]);
+        Artisan::call('db:seed');
 
         $user->assignRole($role);
 
@@ -89,7 +88,7 @@ class AuthControllerTest extends TestCase
     {
         $user = User::factory()->create();
 
-        \Artisan::call('db:seed', ['-vvv' => true]);
+        Artisan::call('db:seed');
 
         $user->assignRole(UserRoles::SUPER_ADMIN);
 
@@ -131,7 +130,7 @@ class AuthControllerTest extends TestCase
 
         $role = UserRoles::SUPER_ADMIN;
 
-        \Artisan::call('db:seed', ['-vvv' => true]);
+        Artisan::call('db:seed');
 
         $user->assignRole($role);
 
@@ -279,11 +278,7 @@ class AuthControllerTest extends TestCase
         $user = User::factory()->create();
         $user->assignRole(UserRoles::SUPER_ADMIN);
 
-        $role = UserRoles::PARTNER;
-
-        \Artisan::call('db:seed', ['-vvv' => true]);
-
-        $user->assignRole($role);
+        Artisan::call('db:seed');
 
         $token = strtoupper(substr(md5(uniqid(rand(), true)), 0, 6));
 
