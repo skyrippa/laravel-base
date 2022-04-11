@@ -4,7 +4,7 @@ namespace App\Models;
 
 use App\Enums\UserRoles;
 use App\Models\Traits\LegalEntityTrait;
-use App\Models\Traits\UnmaskTrait;
+use App\Models\Traits\SanitizeTrait;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
@@ -13,7 +13,7 @@ use Spatie\Permission\Traits\HasRoles;
 
 class User extends Authenticatable
 {
-    use HasApiTokens, UnmaskTrait, LegalEntityTrait, HasFactory, Notifiable, HasRoles;
+    use HasApiTokens, SanitizeTrait, LegalEntityTrait, HasFactory, Notifiable, HasRoles;
 
     /**
      * The attributes that are mass assignable.
@@ -67,5 +67,10 @@ class User extends Authenticatable
             return true;
 
         return false;
+    }
+
+    public function addresses()
+    {
+        return $this->hasMany(Address::class);
     }
 }

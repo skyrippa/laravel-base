@@ -4,7 +4,7 @@ namespace App\Models\Traits;
 
 use App\Utils\Helpers;
 
-trait UnmaskTrait
+trait SanitizeTrait
 {
     protected static function bootUnmaskTrait()
     {
