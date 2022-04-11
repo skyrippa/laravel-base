@@ -23,4 +23,11 @@ class AddressService
     {
         return new AddressValidator();
     }
+
+    protected function relationships()
+    {
+        return [
+           'client', 'city', 'state',
+        ];
+    }
 }

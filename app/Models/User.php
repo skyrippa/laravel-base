@@ -10,10 +10,12 @@ use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Laravel\Passport\HasApiTokens;
 use Spatie\Permission\Traits\HasRoles;
+use OwenIt\Auditing\Contracts\Auditable as AuditableContracts;
+use \OwenIt\Auditing\Auditable;
 
-class User extends Authenticatable
+class User extends Authenticatable implements AuditableContracts
 {
-    use HasApiTokens, SanitizeTrait, LegalEntityTrait, HasFactory, Notifiable, HasRoles;
+    use HasApiTokens, SanitizeTrait, LegalEntityTrait, HasFactory, Notifiable, HasRoles, Auditable;
 
     /**
      * The attributes that are mass assignable.

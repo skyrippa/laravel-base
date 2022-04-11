@@ -106,6 +106,7 @@ trait ServiceTrait
             $this->validationRules()->validate($request->all());
 
             $result = $this->model()->create($request->all());
+            $result->refresh();
         });
 
         return $result->load($this->relationships());
@@ -142,6 +143,7 @@ trait ServiceTrait
             $this->validationRules()->validate(array_merge(['id' => $id], $request->all()));
 
             $result->update($request->all());
+            $result->refresh();
         });
 
         return $result->load($this->relationships());
@@ -161,7 +163,6 @@ trait ServiceTrait
         DB::transaction(function () use (&$request, &$result, &$id) {
 
             $result = $this->model()->findOrFail($id);
-
             $result->delete();
         });
 
@@ -180,7 +181,6 @@ trait ServiceTrait
         $result = null;
 
         DB::transaction(function () use (&$request, &$result, &$id) {
-
             $result = $this->model()->withTrashed()->findOrFail($id);
             $result->restore();
         });

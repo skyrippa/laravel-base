@@ -2,12 +2,12 @@
 
 namespace Tests\Feature\Http\Controllers\Api;
 
-use App\Enums\SettingEnum;
 use App\Enums\UserRoles;
-use App\Models\Partner;
-use App\Models\Setting;
+use App\Models\Address;
+use App\Models\City;
+use App\Models\Client;
+use App\Models\State;
 use App\Models\User;
-use App\Utils\Helpers;
 use Illuminate\Foundation\Testing\DatabaseMigrations;
 use Illuminate\Support\Facades\Artisan;
 use Laravel\Passport\Passport;
@@ -17,16 +17,27 @@ class AddressControllerTest extends TestCase
 {
     use DatabaseMigrations;
 
-    protected $user = null;
+    protected $user;
+    protected $client;
+    protected $city;
+    protected $state;
     protected const URL = '/api/addresses';
 
     public function setUp(): void
     {
         parent::setUp();
 
-        $role = UserRoles::SUPER_ADMIN;
+        $role = UserRoles::CLIENT;
 
         $this->user = User::factory()->create();
+        $this->client = Client::factory()->create([
+            'user_id' => $this->user->id,
+        ]);
+
+        $this->state = State::factory()->create();
+        $this->city = City::factory()->create([
+            'state_id' => $this->state->id,
+        ]);
 
         Artisan::call('db:seed');
 
@@ -51,17 +62,19 @@ class AddressControllerTest extends TestCase
 
     private const DATA_STRUCTURE = [
         'id',
-        'name',
-        'user_id',
-        'owner_name',
-        'domain',
-        'pix_key_type',
-        'pix_merchant_name',
-        'pix_merchant_city',
-        'pix_key',
-        'whatsapp',
-        'user',
-        'reserve_limit_hours',
+        'client_id',
+        'zip_code',
+        'street',
+        'house_number',
+        'neighborhood',
+        'complement',
+        'observation',
+        'phone',
+        'state_id',
+        'city_id',
+        'client' => [
+            'name',
+        ],
     ];
 
     /**
@@ -72,8 +85,8 @@ class AddressControllerTest extends TestCase
         $index = $this->json('GET', self::URL);
         $index->assertStatus(401);
 
-        $index_all = $this->json('GET', self::URL . '/all');
-        $index_all->assertStatus(401);
+        $indexAll = $this->json('GET', self::URL . '/all');
+        $indexAll->assertStatus(401);
 
         $store = $this->json('POST', self::URL);
         $store->assertStatus(401);
@@ -109,8 +122,8 @@ class AddressControllerTest extends TestCase
         $index = $this->json('GET', self::URL);
         $index->assertStatus(403);
 
-        $index_all = $this->json('GET', self::URL . '/all');
-        $index_all->assertStatus(403);
+        $indexAll = $this->json('GET', self::URL . '/all');
+        $indexAll->assertStatus(403);
 
         $store = $this->json('POST', self::URL);
         $store->assertStatus(403);
@@ -164,19 +177,20 @@ class AddressControllerTest extends TestCase
     {
         $quantity = 10;
 
-        $upperLimit = ($quantity / 2) > 20 ? 20 : ($quantity / 2);
+        $upperLimit = min(($quantity / 2), 20);
 
-        Partner::factory()->count($quantity)
-            ->forUser()
-            ->create();
+        Address::factory()->count($quantity)
+            ->create([
+                'client_id' => $this->client->id,
+            ]);
 
-        Partner::limit($quantity / 2)->delete();
+        Address::limit($quantity / 2)->delete();
 
-        $this->assertDatabaseCount('partners', $quantity);
+        $this->assertDatabaseCount('addresses', $quantity);
 
         Passport::actingAs($this->user);
 
-        $response = $this->json('GET', self::URL . '');
+        $response = $this->json('GET', self::URL);
 
         $response->assertStatus(200)
             ->assertJsonStructure(self::COLLECTION_STRUCTURE)
@@ -185,7 +199,7 @@ class AddressControllerTest extends TestCase
 
         // limit
         $limit    = 2;
-        $response = $this->json('GET', self::URL . '', [
+        $response = $this->json('GET', self::URL, [
             'limit' => $limit,
         ]);
 
@@ -195,7 +209,7 @@ class AddressControllerTest extends TestCase
 
 
         // FILTERS
-        $data   = Partner::first();
+        $data   = Address::first();
         $wheres = "where[]=id,$data->id";
 
         $response = $this->json('GET', self::URL . "?$wheres");
@@ -211,7 +225,7 @@ class AddressControllerTest extends TestCase
             ->assertJsonCount(1, 'data');
 
         // where
-        $wheres = "where[]=name,$data->name";
+        $wheres = "where[]=street,$data->street";
 
         $response = $this->json('GET', self::URL . "?$wheres");
 
@@ -227,8 +241,8 @@ class AddressControllerTest extends TestCase
 
 
         // like
-        $data  = Partner::latest('id')->first();
-        $likes = "like[]=name,$data->name";
+        $data  = Address::latest('id')->first();
+        $likes = "like[]=street,$data->street";
 
         $response = $this->json('GET', self::URL . "?$likes");
 
@@ -254,7 +268,7 @@ class AddressControllerTest extends TestCase
 
 
         // order by id desc
-        $data  = Partner::latest('id')->first();
+        $data  = Address::latest('id')->first();
         $query = "order=id,desc";
 
         $response = $this->json('GET', self::URL . "?$query");
@@ -273,10 +287,10 @@ class AddressControllerTest extends TestCase
         // search with order by
         $query = "order=id,asc";
 
-        $partner1 = Partner::first();
+        $partner1 = Address::first();
         $query    = $query . "&search[]=id,$partner1->id";
 
-        $partner2 = Partner::latest('id')->first();
+        $partner2 = Address::latest('id')->first();
         $query    = $query . "&search[]=id,$partner2->id";
 
         $response = $this->json('GET', self::URL . "?$query");
@@ -296,15 +310,13 @@ class AddressControllerTest extends TestCase
 
 
         //search with relationship
-        $user = User::factory()->create();
+        Address::factory()
+            ->create([
+                'client_id' => $this->client->id,
+            ]);
 
-        $partner = Partner::factory()
-            ->forUser()
-            ->create();
-
-        $email = Partner::first()->user->email;
-
-        $query = "search[]=user.email,$email";
+        $name = Address::first()->client->name;
+        $query = "search[]=client.name,$name";
 
         $response = $this->json('GET', self::URL . "?$query");
 
@@ -313,11 +325,11 @@ class AddressControllerTest extends TestCase
 
 
         // various filters
-        $date  = Partner::first()->created_at->format('Y-m-d');
+        $date  = Address::first()->created_at->format('Y-m-d');
         $query = "between[]=created_at,$date,$date";
 
-        $data  = Partner::latest('id')->first();
-        $query = $query . "&like[]=name,$data->name";
+        $data  = Address::latest('id')->first();
+        $query = $query . "&like[]=street,$data->street";
         $query = $query . "&where[]=id,$data->id";
 
         $response = $this->json('GET', self::URL . "?$query");
@@ -336,47 +348,18 @@ class AddressControllerTest extends TestCase
     /**
      * @test
      */
-    public function canReturnSettingsOnIndex()
-    {
-        $partner = Partner::factory()->forUser()->create();
-        $setting = Setting::factory()->create([
-            'model_type' => Partner::class,
-            'model_id'   => $partner->id,
-        ]);
-
-        Passport::actingAs($this->user);
-
-        $response = $this->json('GET', self::URL . '');
-
-        $response->assertStatus(200)
-            ->assertJsonStructure(self::COLLECTION_STRUCTURE)
-            ->assertJson([
-                'data' => [
-                    0 => [
-                        'id'       => $partner->id,
-                        'settings' => [
-                            $setting->key => $setting->value,
-                        ]
-                    ]
-                ]
-            ])
-            ->assertJsonCount(1, 'data.*');
-    }
-
-    /**
-     * @test
-     */
     public function canReturnSoftDeletedPaginatedCollection()
     {
         $quantity = 10;
 
-        Partner::factory()->count($quantity)
-            ->forUser()
-            ->create();
+        Address::factory()->count($quantity)
+            ->create([
+                'client_id' => $this->client->id,
+            ]);
 
-        Partner::limit($quantity / 2)->delete();
+        Address::limit($quantity / 2)->delete();
 
-        $this->assertDatabaseCount('partners', $quantity);
+        $this->assertDatabaseCount('addresses', $quantity);
 
         Passport::actingAs($this->user);
 
@@ -392,128 +375,44 @@ class AddressControllerTest extends TestCase
      */
     public function canStore()
     {
-        $data     = Partner::factory()->make();
-        $userData = User::factory()->make();
-
-        $data->email    = $userData->email;
-        $data->document = $userData->document;
-        $data->phone    = $userData->phone;
-
-        $data->settings          = Setting::convertBoolean(Setting::all());
-        $nullKey                 = Helpers::genRandomString();
-        $data->settings->nullKey = '';
+        $data = Address::factory()->make([
+            'state_id' => $this->state->id,
+            'city_id' => $this->city->id,
+        ]);
 
         Passport::actingAs($this->user);
 
         $response = $this->json('POST', self::URL, $data->toArray());
-        $body     = $response->getData();
 
         $response->assertStatus(201)
-            ->assertJsonStructure(array_merge(self::DATA_STRUCTURE, ["password"]))
+            ->assertJsonStructure(self::DATA_STRUCTURE)
             ->assertJson([
-                'name'                => $data->name,
-                'owner_name'          => $data->owner_name,
-                'domain'              => $data->domain,
-                'pix_key_type'        => $data->pix_key_type,
-                'pix_merchant_name'   => $data->pix_merchant_name,
-                'pix_merchant_city'   => $data->pix_merchant_city,
-                'pix_key'             => $data->pix_key,
-                'whatsapp'            => Helpers::sanitizeString($data->whatsapp),
-                'reserve_limit_hours' => 0,
-                'user'                => [
-                    'email' => $data->email,
-                ],
+                'client_id' => $this->client->id,
+                'zip_code' => $data->zip_code,
+                'street' => $data->street,
+                'house_number' => $data->house_number,
+                'neighborhood' => $data->neighborhood,
+                'complement' => $data->complement,
+                'observation' => $data->observation,
+                'phone' => $data->phone,
+                'state_id' => $data->state_id,
+                'city_id' => $data->city_id,
+                'state' => $this->state->toArray(),
+                'city' => $this->city->toArray(),
+                'client' => $this->client->toArray(),
             ]);
 
-        $this->assertDatabaseHas('partners', [
-            'name'                => $data->name,
-            'owner_name'          => $data->owner_name,
-            'domain'              => $data->domain,
-            'pix_key_type'        => $data->pix_key_type,
-            'pix_merchant_name'   => $data->pix_merchant_name,
-            'pix_merchant_city'   => $data->pix_merchant_city,
-            'pix_key'             => $data->pix_key,
-            'whatsapp'            => Helpers::sanitizeString($data->whatsapp),
-            'reserve_limit_hours' => 0,
-        ]);
-
-        $this->assertDatabaseHas('users', [
-            'name'     => $data->name,
-            'email'    => $data->email,
-            'phone'    => Helpers::sanitizeString($data->phone),
-            'document' => Helpers::sanitizeString($data->document),
-        ]);
-
-        foreach (Setting::partnerConfig() as $key => $value) {
-            $this->assertDatabaseHas('settings', [
-                'key'        => $key,
-                'value'      => $value,
-                'model_type' => Partner::class,
-                'model_id'   => $body->id,
-            ]);
-        }
-    }
-
-    /**
-     * @test
-     */
-    public function canStoreWithLogo()
-    {
-        $data     = Partner::factory()->make();
-        $userData = User::factory()->make();
-
-        $data->email               = $userData->email;
-        $data->document            = $userData->document;
-        $data->phone               = $userData->phone;
-        $data->reserve_limit_hours = rand(1, 7);
-
-        $data->settings['logo'] = TestCase::BASE64_EXAMPLE;
-
-        Passport::actingAs($this->user);
-
-        $response = $this->json('POST', self::URL, $data->toArray());
-        $body     = $response->getData();
-
-        $response->assertStatus(201)
-            ->assertJsonStructure(array_merge(self::DATA_STRUCTURE, ["password"]))
-            ->assertJson([
-                'name'                => $data->name,
-                'owner_name'          => $data->owner_name,
-                'domain'              => $data->domain,
-                'pix_key_type'        => $data->pix_key_type,
-                'pix_merchant_name'   => $data->pix_merchant_name,
-                'pix_merchant_city'   => $data->pix_merchant_city,
-                'pix_key'             => $data->pix_key,
-                'whatsapp'            => Helpers::sanitizeString($data->whatsapp),
-                'reserve_limit_hours' => $data->reserve_limit_hours,
-                'user'                => [
-                    'email' => $data->email,
-                ]
-            ]);
-
-        $this->assertDatabaseHas('partners', [
-            'name'                => $data->name,
-            'owner_name'          => $data->owner_name,
-            'domain'              => $data->domain,
-            'pix_key_type'        => $data->pix_key_type,
-            'pix_merchant_name'   => $data->pix_merchant_name,
-            'pix_merchant_city'   => $data->pix_merchant_city,
-            'pix_key'             => $data->pix_key,
-            'whatsapp'            => Helpers::sanitizeString($data->whatsapp),
-            'reserve_limit_hours' => $data->reserve_limit_hours,
-        ]);
-
-        $this->assertDatabaseHas('users', [
-            'name'     => $data->name,
-            'email'    => $data->email,
-            'phone'    => Helpers::sanitizeString($data->phone),
-            'document' => Helpers::sanitizeString($data->document),
-        ]);
-
-        $this->assertDatabaseHas('settings', [
-            'key'        => 'logo',
-            'model_type' => Partner::class,
-            'model_id'   => $body->id,
+        $this->assertDatabaseHas('addresses', [
+            'client_id' => $this->client->id,
+            'zip_code' => $data->zip_code,
+            'street' => $data->street,
+            'house_number' => $data->house_number,
+            'neighborhood' => $data->neighborhood,
+            'complement' => $data->complement,
+            'observation' => $data->observation,
+            'phone' => $data->phone,
+            'state_id' => $data->state_id,
+            'city_id' => $data->city_id,
         ]);
     }
 
@@ -522,13 +421,10 @@ class AddressControllerTest extends TestCase
      */
     public function canShow()
     {
-        $data = Partner::factory()
-            ->forUser()
-            ->create();
-
-        $setting = Setting::factory()->create([
-            'model_type' => Partner::class,
-            'model_id'   => $data->id,
+        $data = Address::factory()->create([
+            'state_id' => $this->state->id,
+            'city_id' => $this->city->id,
+            'client_id' => $this->client->id,
         ]);
 
         Passport::actingAs($this->user);
@@ -537,13 +433,7 @@ class AddressControllerTest extends TestCase
 
         $response->assertStatus(200)
             ->assertJsonStructure(self::DATA_STRUCTURE)
-            ->assertJson(
-                array_merge($data->toArray(), [
-                    'settings' => [
-                        $setting->key => $setting->value,
-                    ]
-                ])
-            );
+            ->assertJson($data->toArray());
     }
 
     /**
@@ -551,9 +441,12 @@ class AddressControllerTest extends TestCase
      */
     public function willReturn422IfValidationFails()
     {
-        $data = Partner::factory()
-            ->forUser()
-            ->create();
+        $data = Address::factory()
+            ->create([
+                'state_id' => $this->state->id,
+                'city_id' => $this->city->id,
+                'client_id' => $this->client->id,
+            ]);
 
         Passport::actingAs($this->user);
 
@@ -563,13 +456,12 @@ class AddressControllerTest extends TestCase
 
         $response->assertStatus(422);
 
-        $data = Partner::factory()
-            ->forUser()
+        $data = Address::factory()
             ->make([
-                'name' => null,
+                'street' => null,
             ]);
 
-        $response = $this->json('POST', self::URL . "", $data->toArray());
+        $response = $this->json('POST', self::URL, $data->toArray());
 
         $response->assertStatus(422);
     }
@@ -579,168 +471,46 @@ class AddressControllerTest extends TestCase
      */
     public function canUpdate()
     {
-        $partner = Partner::factory()
-            ->forUser()
-            ->create();
-
-        $data = Partner::factory()
-            ->forUser()
-            ->make();
-
-        $settings = Setting::factory()->count(2)->create([
-            'model_type' => Partner::class,
-            'model_id'   => $partner->id,
+        $address = Address::factory()->create([
+            'state_id' => $this->state->id,
+            'city_id' => $this->city->id,
+            'client_id' => $this->client->id,
         ]);
 
-        $data->settings = Setting::convertBoolean($settings);
-
-        $userData = User::factory()->make();
-
-        $data->email    = $userData->email;
-        $data->document = $userData->document;
-        $data->phone    = $userData->phone;
+        $data = Address::factory()
+            ->make();
 
         Passport::actingAs($this->user);
 
-        $response = $this->json('PUT', self::URL . "/$partner->id", $data->toArray());
+        $response = $this->json('PUT', self::URL . "/$address->id", $data->toArray());
 
         $response->assertStatus(200)
             ->assertJsonStructure(self::DATA_STRUCTURE)
             ->assertJson([
-                'name'              => $data->name,
-                'owner_name'        => $data->owner_name,
-                'domain'            => $data->domain,
-                'pix_key_type'      => $data->pix_key_type,
-                'pix_merchant_name' => $data->pix_merchant_name,
-                'pix_merchant_city' => $data->pix_merchant_city,
-                'pix_key'           => $data->pix_key,
-                'whatsapp'          => Helpers::sanitizeString($data->whatsapp),
+                'client_id' => $this->client->id,
+                'zip_code' => $data->zip_code,
+                'street' => $data->street,
+                'house_number' => $data->house_number,
+                'neighborhood' => $data->neighborhood,
+                'complement' => $data->complement,
+                'observation' => $data->observation,
+                'phone' => $data->phone,
+                'state_id' => $data->state_id,
+                'city_id' => $data->city_id,
+                'client' => $this->client->toArray(),
             ]);
 
-        $this->assertDatabaseHas('partners', [
-            'name'              => $data->name,
-            'owner_name'        => $data->owner_name,
-            'domain'            => $data->domain,
-            'pix_key_type'      => $data->pix_key_type,
-            'pix_merchant_name' => $data->pix_merchant_name,
-            'pix_merchant_city' => $data->pix_merchant_city,
-            'pix_key'           => $data->pix_key,
-            'whatsapp'          => Helpers::sanitizeString($data->whatsapp),
-        ]);
-
-        $this->assertDatabaseHas('users', [
-            'name'     => $data->name,
-            'email'    => $data->email,
-            'phone'    => Helpers::sanitizeString($data->phone),
-            'document' => Helpers::sanitizeString($data->document),
-        ]);
-
-        foreach ($settings as $setting) {
-            $this->assertDatabaseHas('settings', [
-                'key'        => $setting->key,
-                'value'      => $setting->value,
-                'model_type' => Partner::class,
-                'model_id'   => $partner->id,
-            ]);
-        }
-    }
-
-    /**
-     * @test
-     */
-    public function canUpdateRemovingPaymentServiceToken()
-    {
-        $partner = Partner::factory()
-            ->forUser()
-            ->create();
-
-        $data = Partner::factory()
-            ->forUser()
-            ->make();
-
-        $keyToBeRemoved = Helpers::genRandomString();
-        Setting::factory()->create([
-            'model_type' => Partner::class,
-            'model_id'   => $partner->id,
-            'key'        => $keyToBeRemoved,
-        ]);
-
-        $settings = Setting::factory()->count(2)->create([
-            'model_type' => Partner::class,
-            'model_id'   => $partner->id,
-        ]);
-
-        $newSetting = Setting::factory()->make([
-            'model_type' => Partner::class,
-            'model_id'   => $partner->id,
-        ]);
-        $newKey     = $newSetting->key;
-
-        $data->settings                  = Setting::convertBoolean($settings);
-        $data->settings->$newKey         = $newSetting->value;
-        $data->settings->$keyToBeRemoved = '';
-
-        $userData = User::factory()->make();
-
-        $data->email    = $userData->email;
-        $data->document = $userData->document;
-        $data->phone    = $userData->phone;
-
-        Passport::actingAs($this->user);
-
-        $response = $this->json('PUT', self::URL . "/$partner->id", $data->toArray());
-
-        $response->assertStatus(200)
-            ->assertJsonStructure(self::DATA_STRUCTURE)
-            ->assertJson([
-                'name'              => $data->name,
-                'owner_name'        => $data->owner_name,
-                'domain'            => $data->domain,
-                'pix_key_type'      => $data->pix_key_type,
-                'pix_merchant_name' => $data->pix_merchant_name,
-                'pix_merchant_city' => $data->pix_merchant_city,
-                'pix_key'           => $data->pix_key,
-                'whatsapp'          => Helpers::sanitizeString($data->whatsapp),
-            ]);
-
-        $this->assertDatabaseHas('partners', [
-            'name'              => $data->name,
-            'owner_name'        => $data->owner_name,
-            'domain'            => $data->domain,
-            'pix_key_type'      => $data->pix_key_type,
-            'pix_merchant_name' => $data->pix_merchant_name,
-            'pix_merchant_city' => $data->pix_merchant_city,
-            'pix_key'           => $data->pix_key,
-            'whatsapp'          => Helpers::sanitizeString($data->whatsapp),
-        ]);
-
-        $this->assertDatabaseHas('users', [
-            'name'     => $data->name,
-            'email'    => $data->email,
-            'phone'    => Helpers::sanitizeString($data->phone),
-            'document' => Helpers::sanitizeString($data->document),
-        ]);
-
-        foreach ($settings as $setting) {
-            $this->assertDatabaseHas('settings', [
-                'key'        => $setting->key,
-                'value'      => $setting->value,
-                'model_type' => Partner::class,
-                'model_id'   => $partner->id,
-            ]);
-        }
-
-        $this->assertDatabaseHas('settings', [
-            'key'        => $newSetting->key,
-            'value'      => $newSetting->value,
-            'model_type' => Partner::class,
-            'model_id'   => $partner->id,
-        ]);
-
-        $this->assertDatabaseMissing('settings', [
-            'key'        => $keyToBeRemoved,
-            'model_type' => Partner::class,
-            'model_id'   => $partner->id,
+        $this->assertDatabaseHas('addresses', [
+            'client_id' => $this->client->id,
+            'zip_code' => $data->zip_code,
+            'street' => $data->street,
+            'house_number' => $data->house_number,
+            'neighborhood' => $data->neighborhood,
+            'complement' => $data->complement,
+            'observation' => $data->observation,
+            'phone' => $data->phone,
+            'state_id' => $data->state_id,
+            'city_id' => $data->city_id,
         ]);
     }
 
@@ -749,9 +519,11 @@ class AddressControllerTest extends TestCase
      */
     public function canDelete()
     {
-        $data = Partner::factory()
-            ->forUser()
-            ->create();
+        $data = Address::factory()->create([
+            'state_id' => $this->state->id,
+            'city_id' => $this->city->id,
+            'client_id' => $this->client->id,
+        ]);
 
         Passport::actingAs($this->user);
 
@@ -760,7 +532,7 @@ class AddressControllerTest extends TestCase
         $response->assertStatus(204)
             ->assertSee(null);
 
-        $this->assertSoftDeleted('partners', [
+        $this->assertSoftDeleted('addresses', [
             'id' => $data->id
         ]);
     }
@@ -770,10 +542,11 @@ class AddressControllerTest extends TestCase
      */
     public function canRestore()
     {
-        $data = Partner::factory()
-            ->forUser()
-            ->create();
-
+        $data = Address::factory()->create([
+            'state_id' => $this->state->id,
+            'city_id' => $this->city->id,
+            'client_id' => $this->client->id,
+        ]);
         $data->delete();
 
         Passport::actingAs($this->user);
@@ -784,139 +557,44 @@ class AddressControllerTest extends TestCase
             ->assertJsonStructure(self::DATA_STRUCTURE)
             ->assertJson($data->makeHidden(['deleted_at', 'updated_at',])->toArray());
 
-        $this->assertDatabaseHas('partners', [
-            "id"   => $data->id,
-            "name" => $data->name,
+        $this->assertDatabaseHas('addresses', [
+            "id" => $data->id,
         ]);
     }
 
     /**
      * @test
      */
-    public function canReturnProfile()
+    public function canGetAudits()
     {
-        $user = User::factory()->create();
-        $user->assignRole(UserRoles::PARTNER);
-
-        $partner = Partner::factory()
-            ->create([
-                'user_id' => $user->id,
-            ]);
-
-        Passport::actingAs($user);
-
-        $response = $this->json('GET', self::URL . "/me");
-
-        $response->assertStatus(200)
-            ->assertJsonStructure(self::DATA_STRUCTURE)
-            ->assertJson($partner->toArray());
-
-
-        $user2 = User::factory()->create();
-        $user2->assignRole(UserRoles::PARTNER);
-
-        $partner2 = Partner::factory()
-            ->create([
-                'user_id' => $user2->id,
-            ]);
-
-        $response = $this->json('GET', self::URL . "/me");
-
-        $response->assertStatus(200)
-            ->assertJsonStructure(self::DATA_STRUCTURE)
-            ->assertJson($partner->toArray());
-    }
-
-    /**
-     * @test
-     */
-    public function canGetPartnerConfig()
-    {
-        $partnerUser = User::factory()->create();
-        $partnerUser->assignRole(UserRoles::PARTNER);
-
-        $partner = Partner::factory()
-            ->create([
-                'domain'  => Helpers::genRandomString(),
-                'user_id' => $partnerUser->id,
-            ]);
-
-        $partnerSetting = Setting::factory()->create([
-            'key'        => Helpers::genRandomString(),
-            'value'      => Helpers::genRandomString(),
-            'model_type' => Partner::class,
-            'model_id'   => $partner->id,
+        $data = Address::factory()->create([
+            'state_id' => $this->state->id,
+            'city_id' => $this->city->id,
+            'client_id' => $this->client->id,
         ]);
 
-        $adminSetting = Setting::factory()->create([
-            'key'   => Helpers::genRandomString(),
-            'value' => Helpers::genRandomString(),
-        ]);
+        Passport::actingAs($this->user);
 
-        $response = $this->json('GET', '/api/partners/config?domain=' . $partner->domain);
+        $response = $this->json('GET', self::URL . "/{$data->id}/audits");
+        $audits   = $response->getData();
 
         $response->assertStatus(200)
             ->assertJson([
-                'partner'  => [
-                    'id'                => $partner->id,
-                    'name'              => $partner->name,
-                    'whatsapp'          => $partner->whatsapp,
-                    'domain'            => $partner->domain,
-                    'pix_key'           => $partner->pix_key,
-                    'pix_key_type'      => $partner->pix_key_type,
-                    'pix_merchant_name' => $partner->pix_merchant_name,
-                    'pix_merchant_city' => $partner->pix_merchant_city,
-                ],
-                'settings' => [
-                    $partnerSetting->key => $partnerSetting->value,
-                ]
-            ])
-            ->assertJsonMissing([
-                'settings' => [
-                    $adminSetting->key => $adminSetting->value,
-                ]
-            ]);
-    }
-
-    /**
-     * @test
-     */
-    public function canUpdateItself()
-    {
-        $user = User::factory()->create();
-        $user->assignRole(UserRoles::PARTNER);
-        $partner = Partner::factory()->create([
-            'user_id' => $user->id,
-        ]);
-
-        $setting1 = Setting::factory()->create([
-            'key'        => SettingEnum::whatsapp_link,
-            'model_type' => Partner::class,
-            'model_id'   => $partner->id,
-        ]);
-        $setting2 = Setting::factory()->create([
-            'model_type' => Partner::class,
-            'model_id'   => $partner->id,
-        ]);
-        $value    = Helpers::genRandomString();
-
-        Passport::actingAs($user);
-        $response = $this->json('PUT', self::URL . "/update/me", [
-            'settings' => [
-                SettingEnum::whatsapp_link => $value,
-            ]
-        ]);
-
-        $response->assertStatus(200)
-            ->assertJson([
-                'settings' => [
-                    SettingEnum::whatsapp_link => $value,
-                    $setting2->key             => $setting2->value,
-                ]
-            ])
-            ->assertJsonMissing([
-                'settings' => [
-                    SettingEnum::whatsapp_link => $setting1->value,
+                0 => [
+                    'id'         => $audits[0]->id,
+                    'event'      => 'created',
+                    'ip_address' => '127.0.0.1',
+                    'old_values' => [],
+                    'new_values' => [
+                        'zip_code' => $data->zip_code,
+                        'street' => $data->street,
+                        'house_number' => $data->house_number,
+                        'neighborhood' => $data->neighborhood,
+                        'state_id' => $data->state_id,
+                        'city_id' => $data->city_id,
+                        'client_id' => $data->client_id,
+                        'id' => $data->id,
+                    ]
                 ]
             ]);
     }
